@@ -1,0 +1,178 @@
+<!DOCTYPE HTML>
+<html>
+
+<head>
+    <script type="text/javascript">
+        window.onload = function () {
+
+            // dataPoints
+            var dataPoints1 = [];
+
+            var chart = new CanvasJS.Chart("chartContainer", {
+                zoomEnabled: true,
+                title: {
+                    text: "Real time data"
+                },
+                toolTip: {
+                    shared: true
+
+                },
+                legend: {
+                    verticalAlign: "top",
+                    horizontalAlign: "center",
+                    fontSize: 14,
+                    fontWeight: "bold",
+                    fontFamily: "calibri",
+                    fontColor: "dimGrey"
+                },
+                axisX: {
+                    title: ""
+                },
+                axisY: {
+                    prefix: '$',
+                    includeZero: false
+                },
+                data: [{
+                    // dataSeries1
+                    type: "line",
+                    xValueType: "dateTime",
+                    showInLegend: true,
+                    name: "Company A",
+                    dataPoints: dataPoints1
+                }],
+                legend: {
+                    cursor: "pointer",
+                    itemclick: function (e) {
+                        if (typeof(e.dataSeries.visible) === "undefined" || e.dataSeries.visible) {
+                            e.dataSeries.visible = false;
+                        }
+                        else {
+                            e.dataSeries.visible = true;
+                        }
+                        chart.render();
+                    }
+                }
+            });
+
+            var lastReceivedTime = -1;
+
+            // starting at 9.30 am
+            var updateChart = function (time, value) {
+
+                if (time < lastReceivedTime) {
+                    console.log("new time is " + time + " skip it because last one was " + lastReceivedTime);
+
+                    chart.render();
+
+                    return;
+                }
+                lastReceivedTime = time;
+                // pushing the new values
+                dataPoints1.push({
+                    x: time,
+                    y: value
+                });
+
+                if (dataPoints1.length > 1000) {
+                    dataPoints1.splice(0, dataPoints1.length - 1000);
+                }
+
+                chart.render();
+            };
+
+            var updateChartDescription = function (averageValue) {
+                chart.options.data[0].legendText = " Company A average price is $" + Math.round(averageValue * 100) / 100;
+                chart.render();
+            };
+
+
+            var updatePerformanceData = function (messagesPerSecond) {
+                chart.options.title.text = "Real time data (" + messagesPerSecond + " messages per second)";
+                chart.render();
+            };
+
+            var socketDataRAW = new WebSocket("ws://localhost:8080/data/raw");
+
+            socketDataRAW.onmessage = function (event) {
+
+                if (event.data instanceof Blob) {
+                    var reader = new FileReader();
+                    reader.onload = function () {
+                        var result = reader.result;
+
+                        var delimiter = result.indexOf(';');
+                        var time = parseInt(result.slice(0, delimiter));
+                        var value = parseInt(result.slice(delimiter + 1));
+
+                        updateChart(time, value);
+                    };
+                    reader.readAsText(event.data);
+                }
+            };
+
+            socketDataRAW.onopen = function (event) {
+                alert("Web Socket opened");
+            };
+
+            socketDataRAW.onclose = function (event) {
+                alert("Web Socket closed");
+            };
+
+
+            var socketDataAverage = new WebSocket("ws://localhost:8080/data/average");
+
+            socketDataAverage.onmessage = function (event) {
+
+                if (event.data instanceof Blob) {
+                    var reader = new FileReader();
+                    reader.onload = function () {
+                        var averageValue = parseFloat(reader.result);
+
+                        updateChartDescription(averageValue);
+                    };
+                    reader.readAsText(event.data);
+                }
+            };
+
+            socketDataAverage.onopen = function (event) {
+                alert("Web Socket opened");
+            };
+
+            socketDataAverage.onclose = function (event) {
+                alert("Web Socket closed");
+            };
+
+            var socketDataPerformance = new WebSocket("ws://localhost:8080/data/perf");
+
+            socketDataPerformance.onmessage = function (event) {
+
+                if (event.data instanceof Blob) {
+                    var reader = new FileReader();
+                    reader.onload = function () {
+                        var value = parseFloat(reader.result);
+
+                        updatePerformanceData(value);
+                    };
+                    reader.readAsText(event.data);
+                }
+            };
+
+            socketDataPerformance.onopen = function (event) {
+                alert("Web Socket opened");
+            };
+
+            socketDataPerformance.onclose = function (event) {
+                alert("Web Socket closed");
+            };
+        }
+
+    </script>
+    <script type="text/javascript" src="canvasjs/canvasjs.min.js"></script>
+</head>
+<body>
+<div id="chartContainer" style="height: 300px; width: 100%;">
+</div>
+</body>
+
+
+</html>
